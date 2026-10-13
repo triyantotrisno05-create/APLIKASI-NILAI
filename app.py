@@ -1,6 +1,6 @@
 from flask import Flask, render_template_string, request, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
-from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+from flask_login import LoginManager, UserMixin
 import math
 
 app = Flask(__name__)
@@ -36,7 +36,7 @@ class NilaiSiswa(db.Model):
 def load_user(user_id):
     return Guru.query.get(int(user_id))
 
-# --- DESAIN TAMPILAN HTML (LANGSUNG DI DALAM FILE PYTHON) ---
+# --- DESAIN TAMPILAN WEB ---
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="id">
@@ -57,13 +57,11 @@ HTML_TEMPLATE = """
       </div>
       <div class="flex items-center space-x-4">
         <span class="text-sm bg-indigo-800 px-3 py-1.5 rounded-full"><i class="fa-solid fa-user me-2"></i>{{ nama }}</span>
-        <a href="/logout" class="text-xs bg-red-500 hover:bg-red-600 px-3 py-1.5 rounded-lg transition font-medium">Keluar</a>
       </div>
     </div>
   </header>
 
   <main class="max-w-6xl mx-auto px-4 mt-8 space-y-8">
-    <!-- Form Input Nilai -->
     <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
       <div class="bg-slate-50 border-b border-slate-200 px-6 py-4">
         <h2 class="text-lg font-bold text-slate-700 flex items-center">
@@ -90,7 +88,7 @@ HTML_TEMPLATE = """
           </div>
           <div>
             <label class="block text-sm font-semibold text-slate-600 mb-1">Mata Pelajaran</label>
-            <input type="text" name="mapel" required class="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="Contoh: IPA, Bahasa Indonesia">
+            <input type="text" name="mapel" required class="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="Contoh: IPA, Matematika">
           </div>
         </div>
 
@@ -129,7 +127,6 @@ HTML_TEMPLATE = """
       </form>
     </div>
 
-    <!-- Tabel Data Nilai -->
     <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
       <div class="bg-slate-50 border-b border-slate-200 px-6 py-4">
         <h2 class="text-lg font-bold text-slate-700 flex items-center">
@@ -200,15 +197,15 @@ HTML_TEMPLATE = """
 </html>
 """
 
-# --- ROUTE UTAMA ---
 @app.route('/')
 def dashboard():
-    # Akun dummy otomatis jika belum login (agar aplikasi langsung berjalan)
-    guru_dummy = Guru.query.first()
-    if not guru_dummy:
-        guru_dummy = Guru(username='admin', password='123', nama_guru='Guru SMP')
-        db.session.add(guru_dummy)
-        db.session.commit()
+    with app.app_context():
+        db.create_all()
+        guru_dummy = Guru.query.first()
+        if not guru_dummy:
+            guru_dummy = Guru(username='admin', password='123', nama_guru='Guru SMP')
+            db.session.add(guru_dummy)
+            db.session.commit()
     
     data_nilai = NilaiSiswa.query.filter_by(guru_id=guru_dummy.id).all()
     return render_template_string(HTML_TEMPLATE, data=data_nilai, nama=guru_dummy.nama_guru)
@@ -228,7 +225,7 @@ def simpan_nilai():
     if pr > 0:
         total = (f * 0.20) + (s * 0.25) + (pts * 0.20) + (pas * 0.20) + (pr * 0.15)
     else:
-        total = (f * 0.25) + (s * 0.35) + (pts * 0.20) + (pas * 0.20)
+        total = (f * 0.25) + (s * 0.35) + (pts * 0.20) + (pas * 0.20);
 
     nilai_bulat = math.floor(total + 0.5)
 
