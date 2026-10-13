@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template_string, request, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 import math
@@ -36,16 +36,186 @@ class NilaiSiswa(db.Model):
 def load_user(user_id):
     return Guru.query.get(int(user_id))
 
-# --- ROUTE / HALAMAN ---
+# --- DESAIN TAMPILAN HTML (LANGSUNG DI DALAM FILE PYTHON) ---
+HTML_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aplikasi Rapot SMP</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800 font-sans pb-12">
+
+  <header class="bg-indigo-700 text-white shadow-md">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+      <div class="flex items-center space-x-3">
+        <i class="fa-solid fa-graduation-cap text-2xl text-indigo-200"></i>
+        <h1 class="text-xl font-bold">Sistem Penilaian Rapot SMP</h1>
+      </div>
+      <div class="flex items-center space-x-4">
+        <span class="text-sm bg-indigo-800 px-3 py-1.5 rounded-full"><i class="fa-solid fa-user me-2"></i>{{ nama }}</span>
+        <a href="/logout" class="text-xs bg-red-500 hover:bg-red-600 px-3 py-1.5 rounded-lg transition font-medium">Keluar</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 mt-8 space-y-8">
+    <!-- Form Input Nilai -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      <div class="bg-slate-50 border-b border-slate-200 px-6 py-4">
+        <h2 class="text-lg font-bold text-slate-700 flex items-center">
+          <i class="fa-solid fa-pen-to-square text-indigo-600 me-2"></i> Form Input Nilai Siswa
+        </h2>
+      </div>
+
+      <form action="/simpan" method="POST" class="p-6 space-y-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label class="block text-sm font-semibold text-slate-600 mb-1">Nama Siswa</label>
+            <input type="text" name="nama_siswa" required class="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="Masukkan nama siswa">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-slate-600 mb-1">Kelas</label>
+            <select name="kelas" required class="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+              <option value="Kelas 7A">Kelas 7A</option>
+              <option value="Kelas 7B">Kelas 7B</option>
+              <option value="Kelas 8A">Kelas 8A</option>
+              <option value="Kelas 8B">Kelas 8B</option>
+              <option value="Kelas 9A">Kelas 9A</option>
+              <option value="Kelas 9B">Kelas 9B</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-slate-600 mb-1">Mata Pelajaran</label>
+            <input type="text" name="mapel" required class="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="Contoh: IPA, Bahasa Indonesia">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-4 bg-indigo-50/50 p-4 rounded-xl border border-indigo-100">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Formatif (0-100)</label>
+            <input type="number" id="formatif" name="formatif" oninput="hitung()" class="w-full border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="0">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Sumatif (0-100)</label>
+            <input type="number" id="sumatif" name="sumatif" oninput="hitung()" class="w-full border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="0">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">PTS (0-100)</label>
+            <input type="number" id="pts" name="pts" oninput="hitung()" class="w-full border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="0">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">PAS (0-100)</label>
+            <input type="number" id="pas" name="pas" oninput="hitung()" class="w-full border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="0">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Praktek (Opsional)</label>
+            <input type="number" id="praktek" name="praktek" oninput="hitung()" class="w-full border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="0">
+          </div>
+        </div>
+
+        <div class="flex flex-col md:flex-row justify-between items-center bg-indigo-900 text-white p-4 rounded-xl shadow-inner gap-4">
+          <div class="text-center md:text-left">
+            <p class="text-xs text-indigo-200">Estimasi Nilai Akhir Rapot (Otomatis Dibulatkan):</p>
+            <span id="nilai-preview" class="text-3xl font-extrabold text-yellow-400">0</span>
+          </div>
+          <button type="submit" class="w-full md:w-auto bg-indigo-500 hover:bg-indigo-600 text-white font-semibold px-6 py-2.5 rounded-lg transition shadow-md">
+            <i class="fa-solid fa-floppy-disk me-2"></i>Simpan Nilai Siswa
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Tabel Data Nilai -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      <div class="bg-slate-50 border-b border-slate-200 px-6 py-4">
+        <h2 class="text-lg font-bold text-slate-700 flex items-center">
+          <i class="fa-solid fa-list-check text-indigo-600 me-2"></i> Daftar Nilai Rapot Terinput
+        </h2>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse text-sm">
+          <thead>
+            <tr class="bg-slate-100 border-b border-slate-200 text-slate-600 font-semibold">
+              <th class="p-4">No</th>
+              <th class="p-4">Siswa</th>
+              <th class="p-4">Kelas</th>
+              <th class="p-4">Mapel</th>
+              <th class="p-4 text-center">Formatif</th>
+              <th class="p-4 text-center">Sumatif</th>
+              <th class="p-4 text-center">PTS</th>
+              <th class="p-4 text-center">PAS</th>
+              <th class="p-4 text-center">Praktek</th>
+              <th class="p-4 text-center bg-indigo-50 text-indigo-900 font-bold">Nilai Rapot</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-200 text-slate-700">
+            {% for item in data %}
+            <tr class="hover:bg-slate-50 transition">
+              <td class="p-4">{{ loop.index }}</td>
+              <td class="p-4 font-semibold text-slate-900">{{ item.nama_siswa }}</td>
+              <td class="p-4"><span class="bg-slate-100 px-2 py-1 rounded border text-xs">{{ item.kelas }}</span></td>
+              <td class="p-4">{{ item.mapel }}</td>
+              <td class="p-4 text-center">{{ item.formatif }}</td>
+              <td class="p-4 text-center">{{ item.sumatif }}</td>
+              <td class="p-4 text-center">{{ item.pts }}</td>
+              <td class="p-4 text-center">{{ item.pas }}</td>
+              <td class="p-4 text-center">{{ item.praktek or '-' }}</td>
+              <td class="p-4 text-center font-bold text-lg text-indigo-600 bg-indigo-50/50">{{ item.nilai_akhir }}</td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="10" class="p-8 text-center text-slate-400">Belum ada data nilai yang dimasukkan.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    function hitung() {
+      const f = parseFloat(document.getElementById('formatif').value) || 0;
+      const s = parseFloat(document.getElementById('sumatif').value) || 0;
+      const pts = parseFloat(document.getElementById('pts').value) || 0;
+      const pas = parseFloat(document.getElementById('pas').value) || 0;
+      const pr = parseFloat(document.getElementById('praktek').value) || 0;
+
+      let total = 0;
+      if (pr > 0) {
+        total = (f * 0.20) + (s * 0.25) + (pts * 0.20) + (pas * 0.20) + (pr * 0.15);
+      } else {
+        total = (f * 0.25) + (s * 0.35) + (pts * 0.20) + (pas * 0.20);
+      }
+
+      document.getElementById('nilai-preview').innerText = Math.round(total);
+    }
+  </script>
+</body>
+</html>
+"""
+
+# --- ROUTE UTAMA ---
 @app.route('/')
-@login_required
 def dashboard():
-    data_nilai = NilaiSiswa.query.filter_by(guru_id=current_user.id).all()
-    return render_template('dashboard.html', data=data_nilai, nama=current_user.nama_guru)
+    # Akun dummy otomatis jika belum login (agar aplikasi langsung berjalan)
+    guru_dummy = Guru.query.first()
+    if not guru_dummy:
+        guru_dummy = Guru(username='admin', password='123', nama_guru='Guru SMP')
+        db.session.add(guru_dummy)
+        db.session.commit()
+    
+    data_nilai = NilaiSiswa.query.filter_by(guru_id=guru_dummy.id).all()
+    return render_template_string(HTML_TEMPLATE, data=data_nilai, nama=guru_dummy.nama_guru)
 
 @app.route('/simpan', methods=['POST'])
-@login_required
 def simpan_nilai():
+    guru_dummy = Guru.query.first()
     nama_siswa = request.form.get('nama_siswa')
     kelas = request.form.get('kelas')
     mapel = request.form.get('mapel')
@@ -55,7 +225,6 @@ def simpan_nilai():
     pas = float(request.form.get('pas') or 0)
     pr = float(request.form.get('praktek') or 0)
 
-    # Perhitungan Nilai Akhir
     if pr > 0:
         total = (f * 0.20) + (s * 0.25) + (pts * 0.20) + (pas * 0.20) + (pr * 0.15)
     else:
@@ -64,7 +233,7 @@ def simpan_nilai():
     nilai_bulat = math.floor(total + 0.5)
 
     baris_baru = NilaiSiswa(
-        guru_id=current_user.id,
+        guru_id=guru_dummy.id,
         nama_siswa=nama_siswa,
         kelas=kelas,
         mapel=mapel,
